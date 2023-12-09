@@ -1,10 +1,11 @@
 package com.vero.justmakefunwithui.components.basetictactoe
 
-import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,47 +17,79 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
-data class Position(
-    val x: Float,
-    val y: Float,
-    val isOval : Boolean,
+data class PlayerGameItem(
+    val centerX: Float,
+    val centerY: Float,
+    val player: Player,
+    val animatable: Animatable<Float, AnimationVector1D>
 )
+
+sealed class Player(val symbol: Symbol) {
+    object Player1: Player(Symbol.Oval)
+    object Player2: Player(Symbol.Cross)
+}
+
+sealed interface Symbol {
+    object Oval : Symbol
+    object Cross : Symbol
+
+}
 
 @Composable
 fun TicTacToe(
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
+    val coroutineScope = rememberCoroutineScope()
 
     var rectOffset by remember { mutableStateOf(Offset.Zero) }
     var rects by remember { mutableStateOf<Array<Array<Rect>>?>(null) }
-    val results = remember { mutableStateListOf<Position>() }
+    val results = remember { mutableStateListOf<PlayerGameItem>() }
+
+    var currentPlayer by remember { mutableStateOf<Player>(Player.Player1) }
 
     Canvas(modifier = modifier
         .pointerInput(true) {
             detectTapGestures { offset ->
-                val transformedMaleRect =
+                val gameRect =
                     Rect(
                         offset = rectOffset,
                         size = Size(size.toPx(), size.toPx())
                     )
 
-                if (transformedMaleRect.contains(offset)) {
+                if (gameRect.contains(offset)) {
                     rects?.forEach { array ->
                         array.forEach { rect ->
                             if (rect.contains(offset)) {
-                                Log.d("TEST_TEST", "TEST" + rect.center.x + ": " + rect.center.y)
-                                results.add(Position(
-                                    rect.center.x,
-                                    rect.center.y,
-                                    isOval = false
-                                ))
+                                val position = PlayerGameItem(
+                                    centerX = rect.center.x,
+                                    centerY = rect.center.y,
+                                    player = currentPlayer,
+                                    animatable = Animatable(0f)
+                                )
+
+                                results.add(position)
+
+                                currentPlayer = if (currentPlayer == Player.Player1)
+                                    Player.Player2
+                                else Player.Player1
+
+                                coroutineScope.launch {
+                                    position.animatable.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = tween(
+                                            durationMillis = 1000
+                                        )
+                                    )
+                                }
                                 return@detectTapGestures
                             }
                         }
@@ -84,24 +117,64 @@ fun TicTacToe(
             }
         }
 
-        drawRect(
-            color = Color.Green,
-            topLeft = topLeftOffset,
-            size = Size(size.toPx(), size.toPx())
-        )
-
         results.forEach {
-            drawPath(
-                Path().apply {
-                    moveTo(it.x, it.y)
-                    lineTo(it.x + 20, it.y + 20)
-                },
-                color = Color.Red,
-                style = Stroke(
-                    width = 5.dp.toPx(),
-                    cap = StrokeCap.Round
+            if (it.player.symbol == Symbol.Cross) {
+                val path1 = Path().apply {
+                    moveTo(it.centerX - 50f, it.centerY - 50f)
+                    lineTo(it.centerX + 50f, it.centerY + 50)
+                }
+                val path2 = Path().apply {
+                    moveTo(it.centerX - 50f, it.centerY + 50f)
+                    lineTo(it.centerX + 50f, it.centerY - 50f)
+                }
+
+                val outPath1 = Path()
+                PathMeasure().apply {
+                    setPath(path1, false)
+                    getSegment(0f, it.animatable.value * length, outPath1, true)
+                }
+                val outPath2 = Path()
+                PathMeasure().apply {
+                    setPath(path2, false)
+                    getSegment(0f, it.animatable.value * length, outPath2, true)
+                }
+
+                drawPath(
+                    outPath1,
+                    color = Color.Red,
+                    style = Stroke(
+                        width = 5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
                 )
-            )
+                drawPath(
+                    outPath2,
+                    color = Color.Red,
+                    style = Stroke(
+                        width = 5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                )
+            } else {
+                val circle = Path().apply {
+                    addOval(Rect(center = Offset(it.centerX, it.centerY), radius = 50f))
+                }
+
+                val outPath = Path()
+                PathMeasure().apply {
+                    setPath(circle, false)
+                    getSegment(0f, it.animatable.value * length, outPath, true)
+                }
+
+                drawPath(
+                    path = outPath,
+                    color = Color.Green,
+                    style = Stroke(
+                        width = 5.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                )
+            }
         }
         drawPath(
             Path().apply {
