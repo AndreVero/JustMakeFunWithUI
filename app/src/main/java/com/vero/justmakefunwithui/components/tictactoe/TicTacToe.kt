@@ -1,4 +1,4 @@
-package com.vero.justmakefunwithui.components.basetictactoe
+package com.vero.justmakefunwithui.components.tictactoe
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 data class PlayerGameItem(
@@ -32,29 +33,36 @@ data class PlayerGameItem(
     val animatable: Animatable<Float, AnimationVector1D>
 )
 
-sealed class Player(val symbol: Symbol) {
-    object Player1: Player(Symbol.Oval)
-    object Player2: Player(Symbol.Cross)
-}
+data class Cell(
+    val rect: Rect,
+    var player: Player?
+)
 
-sealed interface Symbol {
-    object Oval : Symbol
-    object Cross : Symbol
-
+sealed class Player(val color: Color, val char: Char) {
+    object Player1 : Player(color = Color.Green, char = 'O')
+    object Player2 : Player(color = Color.Red, char = 'X')
 }
 
 @Composable
 fun TicTacToe(
     size: Dp,
+    showWinner: (player: Player?) -> Unit,
+    onNewRound: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
+    var isPlaying by remember { mutableStateOf(true) }
     var rectOffset by remember { mutableStateOf(Offset.Zero) }
-    var rects by remember { mutableStateOf<Array<Array<Rect>>?>(null) }
+    var sizeInPx by remember { mutableStateOf(0f) }
+    var cells by remember { mutableStateOf<Array<Array<Cell>>?>(null) }
     val results = remember { mutableStateListOf<PlayerGameItem>() }
 
     var currentPlayer by remember { mutableStateOf<Player>(Player.Player1) }
+
+    LaunchedEffect(key1 = sizeInPx) {
+        cells = initGameBoard(sizeInPx, rectOffset)
+    }
 
     Canvas(modifier = modifier
         .pointerInput(true) {
@@ -65,18 +73,19 @@ fun TicTacToe(
                         size = Size(size.toPx(), size.toPx())
                     )
 
-                if (gameRect.contains(offset)) {
-                    rects?.forEach { array ->
-                        array.forEach { rect ->
-                            if (rect.contains(offset)) {
+                if (gameRect.contains(offset) && isPlaying) {
+                    cells?.forEach { array ->
+                        array.forEach { cell ->
+                            if (cell.rect.contains(offset) && cell.player == null) {
                                 val position = PlayerGameItem(
-                                    centerX = rect.center.x,
-                                    centerY = rect.center.y,
+                                    centerX = cell.rect.center.x,
+                                    centerY = cell.rect.center.y,
                                     player = currentPlayer,
                                     animatable = Animatable(0f)
                                 )
 
                                 results.add(position)
+                                cell.player = currentPlayer
 
                                 currentPlayer = if (currentPlayer == Player.Player1)
                                     Player.Player2
@@ -90,6 +99,23 @@ fun TicTacToe(
                                         )
                                     )
                                 }
+                                cells?.let {
+                                    updateGameState(
+                                        cells = it,
+                                        showWinner = { player ->
+                                            showWinner(player)
+                                            isPlaying = false
+                                            coroutineScope.launch {
+                                                delay(5000)
+                                                cells = initGameBoard(sizeInPx, rectOffset)
+                                                isPlaying = true
+                                                onNewRound()
+                                                results.clear()
+                                            }
+                                        }
+                                    )
+                                }
+
                                 return@detectTapGestures
                             }
                         }
@@ -104,21 +130,10 @@ fun TicTacToe(
         val topLeftOffset = Offset(center.x - halfSize, y = center.y - halfSize)
 
         rectOffset = topLeftOffset
-
-        if (rectOffset != Offset.Zero) {
-            val oneThird = size.toPx() / 3
-            rects = Array(3) { i ->
-                Array(3) { j ->
-                    Rect(
-                        Offset(x = rectOffset.x + j * oneThird, y = rectOffset.y + i * oneThird),
-                        Size(oneThird, oneThird)
-                    )
-                }
-            }
-        }
+        sizeInPx = size.toPx()
 
         results.forEach {
-            if (it.player.symbol == Symbol.Cross) {
+            if (it.player == Player.Player2) {
                 val path1 = Path().apply {
                     moveTo(it.centerX - 50f, it.centerY - 50f)
                     lineTo(it.centerX + 50f, it.centerY + 50)
@@ -221,4 +236,85 @@ fun TicTacToe(
             )
         )
     }
+}
+
+fun initGameBoard(size: Float, rectOffset: Offset): Array<Array<Cell>> {
+
+    val oneThird = size / 3
+    return Array(3) { i ->
+        Array(3) { j ->
+            Cell(
+                player = null,
+                rect = Rect(
+                    Offset(
+                        x = rectOffset.x + j * oneThird,
+                        y = rectOffset.y + i * oneThird
+                    ),
+                    Size(oneThird, oneThird)
+                )
+            )
+        }
+    }
+}
+
+fun updateGameState(cells: Array<Array<Cell>>, showWinner: (Player?) -> Unit) {
+    if (cells[0][0].player != null
+        && cells[0][0].player == cells[0][1].player
+        && cells[0][0].player == cells[0][2].player
+    ) {
+        showWinner(cells[0][0].player!!)
+    }
+
+    if (cells[1][0].player != null
+        && cells[1][0].player == cells[1][1].player
+        && cells[1][0].player == cells[1][2].player
+    ) {
+        showWinner(cells[1][0].player!!)
+    }
+
+    if (cells[2][0].player != null
+        && cells[2][0].player == cells[2][1].player
+        && cells[2][0].player == cells[2][2].player
+    ) {
+        showWinner(cells[2][0].player!!)
+    }
+
+    if (cells[0][0].player != null
+        && cells[0][0].player == cells[1][0].player
+        && cells[0][0].player == cells[2][0].player
+    ) {
+        showWinner(cells[0][0].player!!)
+    }
+
+    if (cells[0][1].player != null
+        && cells[0][1].player == cells[1][1].player
+        && cells[0][1].player == cells[2][1].player
+    ) {
+        showWinner(cells[0][1].player!!)
+    }
+
+    if (cells[0][2].player != null
+        && cells[0][2].player == cells[1][2].player
+        && cells[0][2].player == cells[2][2].player
+    ) {
+        showWinner(cells[0][2].player!!)
+    }
+
+    if (cells[0][0].player != null
+        && cells[1][1].player == cells[0][0].player
+        && cells[2][2].player == cells[0][0].player
+    ) {
+        showWinner(cells[0][0].player!!)
+    }
+
+    if (cells[0][2].player != null
+        && cells[0][2].player == cells[1][1].player
+        && cells[0][2].player == cells[2][0].player
+    ) {
+        showWinner(cells[0][2].player!!)
+    }
+
+    val players = cells.flatMap { it.map { cell -> cell.player } }
+    if (players.all { it != null})
+        showWinner(null)
 }
