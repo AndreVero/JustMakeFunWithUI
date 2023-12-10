@@ -17,31 +17,29 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.lang.Math.PI
+import java.util.Calendar
 import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
 fun Clock(
     radius: Dp,
-    modifier: Modifier
-) {
-    var center by remember {
-        mutableStateOf(Offset.Zero)
-    }
+    modifier: Modifier = Modifier,
 
-    var currentSeconds by remember {
-        mutableStateOf(0)
+) {
+
+    var currentMilliseconds by remember {
+        mutableStateOf(Calendar.getInstance().timeInMillis)
     }
 
     LaunchedEffect(key1 = true) {
         while (isActive) {
             delay(1000)
-            currentSeconds += 1
+            currentMilliseconds += 1000
         }
     }
 
     Canvas(modifier = modifier) {
-        center = this.center
         drawContext.canvas.nativeCanvas.drawCircle(
             center.x,
             center.y,
@@ -61,9 +59,12 @@ fun Clock(
         for (i in 0 until 60) {
             val angleInRad = (i * 6 - 90) * ((PI / 180f).toFloat())
 
+            val length = if (i % 5 == 0) 25.dp else 15.dp
+            val stroke = if (i % 5 == 0) 2.dp else 1.dp
+
             val lineStart = Offset(
-                x = (radius.toPx() - 15.dp.toPx()) * cos(angleInRad) + center.x,
-                y = (radius.toPx() - 15.dp.toPx()) * sin(angleInRad) + center.y
+                x = (radius.toPx() - length.toPx()) * cos(angleInRad) + center.x,
+                y = (radius.toPx() - length.toPx()) * sin(angleInRad) + center.y
             )
             val lineEnd = Offset(
                 x = radius.toPx() * cos(angleInRad) + center.x,
@@ -73,27 +74,51 @@ fun Clock(
                     color = Color.Black,
                     start = lineStart,
                     end = lineEnd,
-                    strokeWidth = 1.dp.toPx()
+                    strokeWidth = stroke.toPx()
                 )
 
         }
 
-        val angleInRad = (currentSeconds * 6 - 90) * ((PI / 180f).toFloat())
+        val angleInRadSeconds = ((currentMilliseconds / 1000 % 60)  * 6 - 90) * ((PI / 180f).toFloat())
+        val angleInRadMinutes = (currentMilliseconds / (1000 * 60) % 60 * 6 - 90) * ((PI / 180f).toFloat())
+        val angleInRadHours = (currentMilliseconds / (1000 * 60 * 60 ) % 24 * 6 - 90) * ((PI / 180f).toFloat())
 
         val lineStart = Offset(
             x = center.x,
             y = center.y
         )
-        val lineEnd = Offset(
-            x = (radius.toPx() - 30.dp.toPx()) * cos(angleInRad) + center.x,
-            y = (radius.toPx() - 30.dp.toPx()) * sin(angleInRad) + center.y
+        val lineSecondsEnd = Offset(
+            x = (radius.toPx() - 30.dp.toPx()) * cos(angleInRadSeconds) + center.x,
+            y = (radius.toPx() - 30.dp.toPx()) * sin(angleInRadSeconds) + center.y
+        )
+        val lineMinutesEnd = Offset(
+            x = (radius.toPx() - 80.dp.toPx()) * cos(angleInRadMinutes) + center.x,
+            y = (radius.toPx() - 80.dp.toPx()) * sin(angleInRadMinutes) + center.y
+        )
+        val lineHoursEnd = Offset(
+            x = (radius.toPx() - 100.dp.toPx()) * cos(angleInRadHours) + center.x,
+            y = (radius.toPx() - 100.dp.toPx()) * sin(angleInRadHours) + center.y
         )
 
         drawLine(
             color = Color.Red,
-            start = lineEnd,
-            end = lineStart,
+            start = lineStart,
+            end = lineSecondsEnd,
             strokeWidth = 3.dp.toPx()
+        )
+
+        drawLine(
+            color = Color.Gray,
+            start = lineStart,
+            end = lineMinutesEnd,
+            strokeWidth = 5.dp.toPx()
+        )
+
+        drawLine(
+            color = Color.Black,
+            start = lineStart,
+            end = lineHoursEnd,
+            strokeWidth = 7.dp.toPx()
         )
     }
 }
