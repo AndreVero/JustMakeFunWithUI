@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.vero.justmakefunwithui.components.genderpicker.GenderPicker
-import com.vero.justmakefunwithui.components.weightpicker.ScaleStyle
-import com.vero.justmakefunwithui.components.weightpicker.WeightPicker
+import com.vero.justmakefunwithui.components.meditationscale.MovableCubicBezier
 import com.vero.justmakefunwithui.ui.theme.JustMakeFunWithUITheme
 
 class MainActivity : ComponentActivity() {
@@ -21,7 +19,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WeightPicker(style = ScaleStyle(), onWeightChanged = {})
+                    MovableCubicBezier()
                 }
             }
         }
